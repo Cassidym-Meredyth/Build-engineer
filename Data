@@ -1,0 +1,11 @@
+Сборка - Snake Game (https://github.com/NicolasHug/snake.git)
+
+Docker image without multistage build:
+docker images info-con
+REPOSITORY   TAG       IMAGE ID       CREATED              SIZE
+info-con     0.1       aec579694610   About a minute ago   423MB
+
+Docker image with multistage build:
+docker images info-con
+REPOSITORY   TAG       IMAGE ID       CREATED         SIZE
+info-con     0.1       6f044dac1554   2 minutes ago   18.9MB
