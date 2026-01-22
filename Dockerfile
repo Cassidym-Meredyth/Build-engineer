@@ -25,7 +25,9 @@ ENV REVISION=$REVISION
 ENV BUILD_NUM=$BUILD_NUM
 
 RUN apt-get update && \
-    apt-get install -y build-essential lcov checkinstall bc
+    apt-get install -y \
+    autoconf automake libtool pkg-config \
+    build-essential lcov checkinstall bc
 
 WORKDIR /app/iperf
 
