@@ -1,31 +1,37 @@
-FROM alpine:3.23.2 AS builder
+# Объявление переменных ДО сборки
+ARG MODE=release
+ARG REVISION=dev
+ARG BUILD_NUM=1
 
-RUN apk update && \
-    apk add build-base && \
-    apk add ncurses-dev && \
-    apk add git
+# Первая стадия сборки образа:
+FROM debian:stable-slim AS builder
 
-WORKDIR /app
-
-RUN git clone https://github.com/NicolasHug/snake.git && \
-    cd snake && \
-    make snake && \
-    mv /app/snake/snake /app/snake_game && \
-    cd .. && \
-    rm -rf /app/snake
-
-USER snake
-
-FROM alpine:3.23.2
-
-COPY --from=builder /app/snake_game /app/snake_game
-
-RUN apk update && apk add ncurses && rm -rf /var/cache/apk/* && \
-    addgroup -S snake && \
-    adduser -S snake -G snake && \
-    chown snake:snake /app/snake_game
+RUN apt-get update && \
+    apt-get install -y git && \
+    rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-USER snake
 
-CMD ["./snake_game"]
+RUN git clone https://github.com/esnet/iperf.git
+
+FROM debian:stable-slim AS runner
+
+ARG MODE
+ARG REVISION
+ARG BUILD_NUM
+
+ENV BUILD_MODE=$MODE
+ENV REVISION=$REVISION
+ENV BUILD_NUM=$BUILD_NUM
+
+RUN apt-get update && \
+    apt-get install -y build-essential lcov checkinstall bc
+
+WORKDIR /app/iperf
+
+COPY --from=builder /app/iperf/ .
+COPY build_mode.sh /app/iperf/build_mode.sh
+
+RUN chmod +x /app/iperf/build_mode.sh
+
+# ENTRYPOINT ["/bin/sh", "/app/build_mode.sh"]
