@@ -2,12 +2,14 @@
 set -e
 
 mkdir -p report
-mkdir -p artifacts
+
 
 MODE="$1"
 REVISION="$(date +%d_%m_%Y_%H_%M_%S)"
 BUILD_NUM="$(find ./report -maxdepth 1 -name 'build_report_*.txt' | wc -l)"
 BUILD_NUM="$((BUILD_NUM + 1))"
+
+rm -rf artifacts/${MODE} || true
 
 TIMESTAMP="${REVISION}"
 REPORT_FILE="build_report_${TIMESTAMP}.txt"
@@ -26,7 +28,7 @@ echo "Режим сборки: ${MODE}"
 echo "Номер сборки: ${BUILD_NUM}"
 echo "Ревизия сборки: ${REVISION}"
 docker run --rm \
-    -v "$(pwd)/artifacts:/app/deb" \
+    --mount type=bind,source="./artifacts/${MODE}",target=/app/out/${MODE}/ \
     -e MODE="${MODE}" \
     -e BUILD_NUM="${BUILD_NUM}" \
     -e REVISION="${REVISION}" \
