@@ -56,3 +56,5 @@ dkms.conf
 
 
 docker-compose.yml
+artifacts
+report
