@@ -1,8 +1,3 @@
-# Объявление переменных ДО сборки
-ARG MODE=release
-ARG REVISION=dev
-ARG BUILD_NUM=1
-
 # Первая стадия сборки образа:
 FROM debian:stable-slim AS builder
 
@@ -16,13 +11,9 @@ RUN git clone https://github.com/esnet/iperf.git
 
 FROM debian:stable-slim AS runner
 
-ARG MODE
-ARG REVISION
-ARG BUILD_NUM
-
-ENV BUILD_MODE=$MODE
-ENV REVISION=$REVISION
-ENV BUILD_NUM=$BUILD_NUM
+# ENV BUILD_MODE=$MODE \
+#     REVISION=$REVISION \
+#     BUILD_NUM=$BUILD_NUM
 
 RUN apt-get update && \
     apt-get install -y \
@@ -36,4 +27,4 @@ COPY build_mode.sh /app/iperf/build_mode.sh
 
 RUN chmod +x /app/iperf/build_mode.sh
 
-# ENTRYPOINT ["/bin/sh", "/app/build_mode.sh"]
+CMD ["./build_mode.sh"]
