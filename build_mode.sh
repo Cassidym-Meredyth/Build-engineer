@@ -1,9 +1,13 @@
 #!/bin/bash
 set -e
 
-case "$BUILD_MODE" in
+export MODE="${MODE}"
+export BUILD_NUM="${BUILD_NUM}"
+export REVISION="${REVISION}"
+
+case "$MODE" in
     release)
-        echo -e "\033[33m=== Building in ${BUILD_MODE} mode ===\033[0m"
+        echo -e "\033[33m=== Building in ${MODE} mode ===\033[0m"
 
         # Release build
         ./bootstrap.sh
@@ -33,9 +37,22 @@ EOF
 
         # iii. Создание release deb пакета
         dpkg-deb --build /app/out/deb /app/out/iperf3_${REVISION}_${BUILD_NUM}_amd64.deb
+
+        echo -e "\033[32m=== Финальный отчет ===\033[0m"
+        echo -e "\033[34mИнформация о пакетах:\033[30m"
+        dpkg-deb -I /app/out/iperf3_*_amd64.deb
+        echo ""
+
+        echo -e "\033[34mРазмер пакетов:\033[30m"
+        du -sh /app/out/
+        echo ""
+
+        echo -e "\033[34mАрхив\033[30m"
+        tar -czf /app/out/iperf3-complete.tar.gz /app/out/iperf3*.deb 2>/dev/null
+        ls -lh /app/out/iperf3-complete.tar.gz
         ;;
     debug)
-        echo -e "\033[33m=== Building in ${BUILD_MODE} mode ===\033[0m"
+        echo -e "\033[33m=== Building in ${MODE} mode ===\033[0m"
 
         # Debug build
         ./bootstrap.sh
@@ -94,22 +111,39 @@ EOF
         chmod 644 /app/out/debug-deb/DEBIAN/control
         dpkg-deb --build /app/out/debug-deb /app/out/iperf3-debug_${BUILD_NUM}_amd64.deb
 
-        echo "Stripped binary: $(file /app/out/deb/usr/bin/iperf3)"
-        echo "Debug file: $(ls -lh ${DEBUG_FILE})"
-        echo "Debug прошел успешно! Финальный отчет:"
+
+        echo -e "\033[32m=== Финальный отчет ===\033[0m"
+        echo -e "\033[34mStripped binary:\033[30m $(file /app/out/deb/usr/bin/iperf3)"
+        echo -e "\033[34mDebug file:\033[30m $(ls -lh ${DEBUG_FILE})"
+        echo ""
+
+        echo -e "\033[34mDeb пакеты:\033[30m"
         ls -lh /app/out/*.deb
+        echo ""
+
+        echo -e "\033[34mИнформация о пакетах:\033[30m"
+        echo -e "\033[30mОсновной ${MODE} пакет\033[30m"
         dpkg-deb -I /app/out/iperf3_*_debug_amd64.deb
+        echo ""
+        echo -e "\033[30mДополнительный ${MODE} пакет\033[30m"
         dpkg-deb -I /app/out/iperf3-debug_*_amd64.deb
+        echo ""
+
+        echo -e "\033[34mРазмер пакетов:\033[30m"
         du -sh /app/out/
+        echo ""
+
         tar -czf /app/out/iperf3-complete.tar.gz /app/out/iperf3*.deb 2>/dev/null
-        ls -lh iperf3-complete.tar.gz
+        ls -lh /app/out/iperf3-complete.tar.gz
         ;;
     coverage)
-        echo -e "\033[33m=== Building in ${BUILD_MODE} mode ===\033[0m"
+        echo -e "\033[33m=== Building in ${MODE} mode ===\033[0m"
+        # Coverage build
+        ./bootstrap.sh
+        ./configure CFLAGS="-O2 -Wall" LDFLAGS="-static" --disable-shared
         ;;
     *)
-        echo "Invalid or unset mode: '${BUILD_MODE}'"
+        echo "Invalid or unset mode: '${MODE}'"
         exit 1
         ;;
 esac
-echo -e "\033[34mСборка выполнена\033[0m"
