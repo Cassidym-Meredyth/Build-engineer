@@ -5,6 +5,9 @@ export MODE="${MODE}"
 export BUILD_NUM="${BUILD_NUM}"
 export REVISION="${REVISION}"
 
+
+mkdir -p /app/out/${MODE}/
+
 case "$MODE" in
     release)
         echo -e "\033[33m=== Building in ${MODE} mode ===\033[0m"
@@ -19,8 +22,9 @@ case "$MODE" in
 
         strip -s /app/staging/usr/local/bin/iperf3
 
-        mkdir -p /app/out/deb/DEBIAN /app/out/deb/usr/bin
-        cat > /app/out/deb/DEBIAN/control << EOF
+        mkdir -p /app/tmp/deb/DEBIAN /app/tmp/deb/usr/bin
+
+        cat > /app/tmp/deb/DEBIAN/control << EOF
 Package: iperf3
 Version: ${BUILD_NUM}
 Architecture: amd64
@@ -30,26 +34,24 @@ Priority: optional
 Description: iperf3 network tool v${BUILD_NUM}
     Stripped release build
 EOF
-        chmod 644 /app/out/deb/DEBIAN/control
+        chmod 644 /app/tmp/deb/DEBIAN/control
 
         # ii. Копируем бинарник с удаленной отладочной информацией (strip)
-        cp /app/staging/usr/local/bin/iperf3 /app/out/deb/usr/bin/
+        cp /app/staging/usr/local/bin/iperf3 /app/tmp/deb/usr/bin/
 
         # iii. Создание release deb пакета
-        dpkg-deb --build /app/out/deb /app/out/iperf3_${REVISION}_${BUILD_NUM}_amd64.deb
+        dpkg-deb --build /app/tmp/deb /app/tmp/iperf3_${REVISION}_${BUILD_NUM}_amd64.deb
 
         echo -e "\033[32m=== Финальный отчет ===\033[0m"
         echo -e "\033[34mИнформация о пакетах:\033[30m"
-        dpkg-deb -I /app/out/iperf3_*_amd64.deb
+        dpkg-deb -I /app/tmp/iperf3_*_amd64.deb
+        echo ""
+
+        cp -r /app/tmp/iperf3_${REVISION}_${BUILD_NUM}_amd64.deb /app/out/${MODE}/iperf3_${REVISION}_${BUILD_NUM}_amd64.deb
         echo ""
 
         echo -e "\033[34mРазмер пакетов:\033[30m"
-        du -sh /app/out/
-        echo ""
-
-        echo -e "\033[34mАрхив\033[30m"
-        tar -czf /app/out/iperf3-complete.tar.gz /app/out/iperf3*.deb 2>/dev/null
-        ls -lh /app/out/iperf3-complete.tar.gz
+        du -sh /app/out/${MODE}/
         ;;
     debug)
         echo -e "\033[33m=== Building in ${MODE} mode ===\033[0m"
@@ -63,12 +65,12 @@ EOF
         make install DESTDIR=/app/staging
 
         DEBUG_BINARY="/app/staging/usr/local/bin/iperf3"
-        DEBUG_FILE="/app/out/iperf3-debug-${REVISION}.dbg"
+        DEBUG_FILE="/app/tmp/iperf3-debug-${REVISION}.dbg"
 
-        mkdir -p /app/out/deb/DEBIAN /app/out/deb/usr/bin /app/out/deb/usr/share/doc/iperf3
-        mkdir -p /app/out/debug-deb/DEBIAN /app/out/debug-deb/usr/lib/debug/usr/bin
+        mkdir -p /app/tmp/deb/DEBIAN /app/tmp/deb/usr/bin /app/tmp/deb/usr/share/doc/iperf3
+        mkdir -p /app/tmp/debug-deb/DEBIAN /app/tmp/debug-deb/usr/lib/debug/usr/bin
 
-        mkdir -p /app/out/deb/usr/bin /app/out/deb/usr/share/doc/iperf3
+        mkdir -p /app/tmp/deb/usr/bin /app/tmp/deb/usr/share/doc/iperf3
         # 1. Извлечь debug symbols
         objcopy --only-keep-debug "${DEBUG_BINARY}" "${DEBUG_FILE}"
 
@@ -76,11 +78,11 @@ EOF
         strip --strip-all "${DEBUG_BINARY}"
         objcopy --add-gnu-debuglink "${DEBUG_FILE}" "${DEBUG_BINARY}"
 
-        cp "${DEBUG_BINARY}" /app/out/deb/usr/bin/iperf3
+        cp "${DEBUG_BINARY}" /app/tmp/deb/usr/bin/iperf3
 
         # 4. Main deb package
         BUILD_VERSION="1.0.${BUILD_NUM}"
-        cat > /app/out/deb/DEBIAN/control << EOF
+        cat > /app/tmp/deb/DEBIAN/control << EOF
 Package: iperf3
 Version: ${BUILD_VERSION}
 Architecture: amd64
@@ -92,12 +94,12 @@ Description: iperf3 network tool debug build v${BUILD_VERSION}
     .
     Use with iperf3-debug package.
 EOF
-        chmod 644 /app/out/deb/DEBIAN/control
-        dpkg-deb --build /app/out/deb /app/out/iperf3_${BUILD_NUM}_debug_amd64.deb
+        chmod 644 /app/tmp/deb/DEBIAN/control
+        dpkg-deb --build /app/tmp/deb /app/tmp/iperf3_${BUILD_NUM}_debug_amd64.deb
 
         # 5. Отдельный debug пакет (bonus)
-        cp "${DEBUG_FILE}" /app/out/debug-deb/usr/lib/debug/usr/bin/iperf3.debug
-        cat > /app/out/debug-deb/DEBIAN/control << EOF
+        cp "${DEBUG_FILE}" /app/tmp/debug-deb/usr/lib/debug/usr/bin/iperf3.debug
+        cat > /app/tmp/debug-deb/DEBIAN/control << EOF
 Package: iperf3-debug
 Version: ${BUILD_VERSION}
 Architecture: amd64
@@ -108,39 +110,88 @@ Depends: iperf3 (= ${BUILD_VERSION})
 Description: iperf3 debug symbols
  Debug information package.
 EOF
-        chmod 644 /app/out/debug-deb/DEBIAN/control
-        dpkg-deb --build /app/out/debug-deb /app/out/iperf3-debug_${BUILD_NUM}_amd64.deb
+        chmod 644 /app/tmp/debug-deb/DEBIAN/control
+        dpkg-deb --build /app/tmp/debug-deb /app/tmp/iperf3-debug_${BUILD_NUM}_amd64.deb
 
 
         echo -e "\033[32m=== Финальный отчет ===\033[0m"
-        echo -e "\033[34mStripped binary:\033[30m $(file /app/out/deb/usr/bin/iperf3)"
+        echo -e "\033[34mStripped binary:\033[30m $(file /app/tmp/deb/usr/bin/iperf3)"
         echo -e "\033[34mDebug file:\033[30m $(ls -lh ${DEBUG_FILE})"
         echo ""
 
         echo -e "\033[34mDeb пакеты:\033[30m"
-        ls -lh /app/out/*.deb
+        ls -lh /app/tmp/*.deb
         echo ""
 
         echo -e "\033[34mИнформация о пакетах:\033[30m"
         echo -e "\033[30mОсновной ${MODE} пакет\033[30m"
-        dpkg-deb -I /app/out/iperf3_*_debug_amd64.deb
+        dpkg-deb -I /app/tmp/iperf3_*_debug_amd64.deb
         echo ""
         echo -e "\033[30mДополнительный ${MODE} пакет\033[30m"
-        dpkg-deb -I /app/out/iperf3-debug_*_amd64.deb
+        dpkg-deb -I /app/tmp/iperf3-debug_*_amd64.deb
         echo ""
+
+        cp /app/tmp/iperf3-debug_${BUILD_NUM}_amd64.deb /app/out/${MODE}/iperf3-debug_${BUILD_NUM}_amd64.deb
+        cp /app/tmp/iperf3_${BUILD_NUM}_amd64.deb /app/out/${MODE}/iperf3_${BUILD_NUM}_amd64.deb
 
         echo -e "\033[34mРазмер пакетов:\033[30m"
-        du -sh /app/out/
-        echo ""
-
-        tar -czf /app/out/iperf3-complete.tar.gz /app/out/iperf3*.deb 2>/dev/null
-        ls -lh /app/out/iperf3-complete.tar.gz
+        du -sh /app/out/${MODE}/
         ;;
     coverage)
         echo -e "\033[33m=== Building in ${MODE} mode ===\033[0m"
         # Coverage build
         ./bootstrap.sh
-        ./configure CFLAGS="-O2 -Wall" LDFLAGS="-static" --disable-shared
+        ./configure CFLAGS="--coverage -O0 -g" LDFLAGS="--coverage"
+        make clean && make -j$(nproc)
+        make install DESTDIR=/app/staging
+
+        export LD_LIBRARY_PATH=/app/staging/usr/local/lib:$LD_LIBRARY_PATH
+
+        BIN="/app/staging/usr/local/bin/iperf3"
+
+        # 2. Integration test
+        echo -e "\033[34mRunning integration test...\033[0m"
+        ${BIN} --version || true
+
+        # 3. Collect coverage
+        echo -e "\033[34mCollecting coverage\033[0m"
+        lcov --directory . \
+             --capture \
+             --output-file coverage.info \
+             --ignore-errors empty
+
+        # 4. Clear system file
+        lcov --remove coverage.info '/usr/*' \
+             --output-file coverage.info
+
+        # 5. Generate HTML report
+        genhtml coverage.info --output-directory coverage-report
+
+        # 6. Get coverage
+        COVERAGE=$(lcov --summary coverage.info | \
+           grep "lines" | \
+           awk '{print $2}' | \
+           sed 's/%//')
+
+        echo -e "\033[31mCoverage\033[0m: ${COVERAGE}%\n"
+
+        # 7. Coverage comparison
+        echo -e "\033[33mCoverage comprasion...\033[0m"
+        PREV_FILE="/app/out/coverage_last.txt"
+
+        if [ -f "${PREV_FILE}" ]; then
+                PREV_COVERAGE=$(cat "${PREV_FILE}")
+                echo "Previous coverage: ${PREV_COVERAGE}%"
+
+                if (( echo "${COVERAGE} < ${PREV_COVERAGE}" | bc -l )); then
+                        echo -e "\033[31mCoverage decreased!\033[0m"
+                        exit 1
+                fi
+        else
+                PREV_COVERAGE=0
+        fi
+
+        echo "${COVERAGE}% > ${PREV_COVERAGE}%"
         ;;
     *)
         echo "Invalid or unset mode: '${MODE}'"
