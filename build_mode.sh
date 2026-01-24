@@ -8,6 +8,11 @@ export REVISION="${REVISION}"
 
 mkdir -p /app/out/${MODE}/
 
+# Создание корневой директории для deb пакетов
+mkdir -p /app/tmp/deb/DEBIAN /app/tmp/deb/usr/bin /app/tmp/deb/usr/share/doc/iperf3
+chmod 644 /app/tmp/*
+
+
 case "$MODE" in
     release)
         echo -e "\033[33m=== Building in ${MODE} mode ===\033[0m"
@@ -22,8 +27,6 @@ case "$MODE" in
 
         strip -s /app/staging/usr/local/bin/iperf3
 
-        mkdir -p /app/tmp/deb/DEBIAN /app/tmp/deb/usr/bin
-
         cat > /app/tmp/deb/DEBIAN/control << EOF
 Package: iperf3
 Version: ${BUILD_NUM}
@@ -34,8 +37,6 @@ Priority: optional
 Description: iperf3 network tool v${BUILD_NUM}
     Stripped release build
 EOF
-        chmod 644 /app/tmp/deb/DEBIAN/control
-
         # ii. Копируем бинарник с удаленной отладочной информацией (strip)
         cp /app/staging/usr/local/bin/iperf3 /app/tmp/deb/usr/bin/
 
@@ -67,10 +68,9 @@ EOF
         DEBUG_BINARY="/app/staging/usr/local/bin/iperf3"
         DEBUG_FILE="/app/tmp/iperf3-debug-${REVISION}.dbg"
 
-        mkdir -p /app/tmp/deb/DEBIAN /app/tmp/deb/usr/bin /app/tmp/deb/usr/share/doc/iperf3
+
         mkdir -p /app/tmp/debug-deb/DEBIAN /app/tmp/debug-deb/usr/lib/debug/usr/bin
 
-        mkdir -p /app/tmp/deb/usr/bin /app/tmp/deb/usr/share/doc/iperf3
         # 1. Извлечь debug symbols
         objcopy --only-keep-debug "${DEBUG_BINARY}" "${DEBUG_FILE}"
 
@@ -81,6 +81,7 @@ EOF
         cp "${DEBUG_BINARY}" /app/tmp/deb/usr/bin/iperf3
 
         # 4. Main deb package
+        echo -e "\033[33m=== Создание DEB-пакета для режима ${MODE} ===\033[0m"
         BUILD_VERSION="1.0.${BUILD_NUM}"
         cat > /app/tmp/deb/DEBIAN/control << EOF
 Package: iperf3
@@ -131,8 +132,7 @@ EOF
         dpkg-deb -I /app/tmp/iperf3-debug_*_amd64.deb
         echo ""
 
-        cp /app/tmp/iperf3-debug_${BUILD_NUM}_amd64.deb /app/out/${MODE}/iperf3-debug_${BUILD_NUM}_amd64.deb
-        cp /app/tmp/iperf3_${BUILD_NUM}_amd64.deb /app/out/${MODE}/iperf3_${BUILD_NUM}_amd64.deb
+        cp -r /app/tmp/iperf3* /app/out/${MODE}/
 
         echo -e "\033[34mРазмер пакетов:\033[30m"
         du -sh /app/out/${MODE}/
@@ -166,7 +166,7 @@ EOF
 
         # 5. Generate HTML report
         genhtml coverage.info --output-directory coverage-report
-
+        cp coverage.info coverage-report/
         # 6. Get coverage
         COVERAGE=$(lcov --summary coverage.info | \
            grep "lines" | \
@@ -183,18 +183,45 @@ EOF
                 PREV_COVERAGE=$(cat "${PREV_FILE}")
                 echo "Previous coverage: ${PREV_COVERAGE}%"
 
-                if (( echo "${COVERAGE} < ${PREV_COVERAGE}" | bc -l )); then
+                if [ "$(echo "${COVERAGE} < ${PREV_COVERAGE}" | bc -l )" -eq 1 ]; then
                         echo -e "\033[31mCoverage decreased!\033[0m"
+                        # В случае ошибки выходим
                         exit 1
+                else
+                    echo -e "\033[32mCoverage maintained or increased! (${COVERAGE}% >= ${PREV_COVERAGE}%)\033[0m"
                 fi
-        else
-                PREV_COVERAGE=0
         fi
+        # Сохраняем новое значение для следующего раза
+        echo "${COVERAGE}" > "${PREV_FILE}"
+        echo ""
+        echo -e "\033[33m=== Создание DEB-пакета для режима ${MODE} ===\033[0m"
 
-        echo "${COVERAGE}% > ${PREV_COVERAGE}%"
+        cat > /app/tmp/deb/DEBIAN/control << EOF
+Package: iperf3-coverage
+Version: 1.0.${BUILD_NUM}
+Architecture: amd64
+Maintainer: Local CI <ci@cassidym>
+Section: network
+Priority: optional
+Description: iperf3 network tool coverage build v1.0.${BUILD_NUM}
+    Coverage: ${COVERAGE}%
+EOF
+
+        cp /app/staging/usr/local/bin/iperf3 /app/tmp/deb/usr/bin/
+
+        dpkg-deb --build /app/tmp/deb /app/tmp/iperf3-coverage_${REVISION}_${BUILD_NUM}_amd64.deb
+
+        echo -e "\033[34mDeb пакет создан:\033[0m"
+        ls -lh /app/tmp/iperf3-coverage_*.deb
+
+        cp /app/tmp/iperf3-coverage_*.deb /app/out/${MODE}/
+        cp -r coverage-report /app/out/${MODE}
+
+        echo -e "\033[34mРазмер пакетов:\033[30m"
+        du -sh /app/out/${MODE}/
         ;;
     *)
-        echo "Invalid or unset mode: '${MODE}'"
+        echo "Invalid or unset mode: ${MODE}"
         exit 1
         ;;
 esac
