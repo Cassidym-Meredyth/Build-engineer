@@ -29,4 +29,4 @@ COPY --from=builder /app/iperf/ .
 COPY build_mode.sh /app/iperf/build_mode.sh
 RUN chmod +x /app/iperf/build_mode.sh
 
-# ENTRYPOINT ["./build_mode.sh"]
+ENTRYPOINT ["./build_mode.sh"]
