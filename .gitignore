@@ -56,5 +56,4 @@ dkms.conf
 
 
 docker-compose.yml
-artifacts
-report
+inst_dir/*
