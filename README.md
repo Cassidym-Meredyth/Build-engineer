@@ -29,7 +29,7 @@ build.sh -> Docker (multi-stage) -> build_mode.sh -> .deb artifacts
 
 | Стандарт                         | Мой подход                    | Обоснование                                                                                                                       |
 | -------------------------------- | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| dh_make -> debian/rules -> debuild | ./configure → make → dpkg-deb | Полный контроль над: <br> - Debug symbols workflow<br> - Custom control файлы <br> - Multi-package output (binary+debug) <br> - Coverage в .deb |
+| dh_make -> debian/rules -> debuild | ./configure -> make -> dpkg-deb | Полный контроль над: <br> - Debug symbols workflow<br> - Custom control файлы <br> - Multi-package output (binary+debug) <br> - Coverage в .deb |
 
 **Почему лучше:**
 ```
