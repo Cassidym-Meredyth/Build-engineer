@@ -24,7 +24,7 @@ build.sh -> Docker (multi-stage) -> build_mode.sh -> .deb artifacts
 | build_mode.sh | Логика сборки: ./configure -> make -> make install -> dpkg-deb    |
 | inst_dir/     | Workspace: artifacts, reports, ccache                             |
 
-## Модернизация и улучшения конвейера**
+## Модернизация и улучшения конвейера
 1. Ручная сборка `.deb` через `dpkg-deb` вместо dh_make/debuild
 
 | Стандарт                         | Мой подход                    | Обоснование                                                                                                                       |
