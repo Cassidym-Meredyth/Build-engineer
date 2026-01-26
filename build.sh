@@ -60,23 +60,29 @@ echo "Ревизия сборки: ${REVISION}"
 # СЛОЖНЫЙ DOCKER RUN с volume mounts для CI/CD pipeline
 # ================================================================
 # --rm: автоочистка контейнера
-# bind mounts: связанные директории между хостом и контейнером
+# ================================================================
+# bind mounts: связанные директории между хостом и контейнером:
+# Mount 1: Артефакты (.deb файлы) -> хост artifacts/${MODE}
+# Mount 2: ccache persistent между сборками
+# Mount 3: Логи/отчеты -> хост report/
+# Mount 4: Coverage state (последний % покрытия)
+# ================================================================
+# Env для ccache
+# ================================================================
+# Переменные сборки для использования уже в скрипте build_mode.sh:
+# MODE, BUILD_NUM, REVISION
+# ================================================================
+# Сам образ контейнера (IMAGE=iperf3:0.1)
+# ================================================================
 docker run --rm \
-    # Артефакты (.deb файлы) -> хост artifacts/${MODE}
     --mount type=bind,source="$(pwd)/${OUT_DIR}",target=/app/out/${MODE}/ \
-    # ccache persistent между сборками
     --mount type=bind,source="$(pwd)/${CACHE_DIR}",target=/ccache \
-    # Логи/отчеты -> хост report/
     --mount type=bind,source="$(pwd)/${LOG_DIR}",target=/app/log \
-    # Coverage state (последний % покрытия)
     --mount type=bind,source="$(pwd)/${INST_DIR}/coverage_last.txt,target=/app/out/coverage_last.txt" \
-    # Env для ccache
     -e CCACHE_DIR=/ccache \
-    # Переменные сборки для использования уже в скрипте build_mode.sh
     -e MODE="${MODE}" \
     -e BUILD_NUM="${BUILD_NUM}" \
     -e REVISION="${REVISION}" \
-    # Сам образ контейнера (iperf3:0.1)
     "${IMAGE}"
 
 echo ""
