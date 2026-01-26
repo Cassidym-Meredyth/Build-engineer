@@ -1,38 +1,48 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
+# Инициализация локального CI/CD workspace
+# Создание директорий для артефактов, отчетов и кеша компиляции
 mkdir -p inst_dir/{report,ccache_dir,artifacts}
+
+# Основная рабочая директория локального конвейера
 INST_DIR="inst_dir"
 
-# Создание файла для хранения последнего процента по coverage
+# Инициализация трекера покрытия тестами
+# Создание файла для хранения последнего % по coverage (если его нет)
 if [ ! -f ${INST_DIR}/coverage_last.txt ]; then
     touch ${INST_DIR}/coverage_last.txt
     echo "0" > ${INST_DIR}/coverage_last.txt
 fi
 
-# Объявление переменных:
-# mode - параметр для запуска сборки (release, debug, coverage)
-# revision - номер ревизии
-# build number - номер сборки
+# Переменные окружения для отчетов и кеша
+LOG_DIR="${INST_DIR}/report"
+CACHE_DIR="${INST_DIR}/ccache_dir"
+
+# ================================================================
+# ПАРАМЕТРЫ СБОРКИ (CI/CD переменные)
+# ================================================================
+# MODE=release|debug|coverage - режим компиляции
+# REVISION - timestamp ревизии (дата_время)
+# BUILD_NUM - автоинкрементный номер сборки
 MODE="$1"
 REVISION="$(date +%d_%m_%Y_%H_%M_%S)"
 BUILD_NUM="$(find ./${INST_DIR}/report -maxdepth 1 -name 'build_report_*.txt' | wc -l)"
 BUILD_NUM="$((BUILD_NUM + 1))"
 
-# Создание файла отчета сборки build_report_{date_time}.txt
-TIMESTAMP="${REVISION}"
-REPORT_FILE="build_report_${TIMESTAMP}.txt"
+# Имя файла отчета текущей сборки - build_report_{date_time}.txt
+REPORT_FILE="build_report_${REVISION}.txt"
 
-# Создание build_report
-echo "Building #${BUILD_NUM}, rev: ${REVISION}, mode: ${MODE}" >> "${INST_DIR}/report/${REPORT_FILE}"
+# Директория выходных артефактов (.deb, coverage reports)
+OUT_DIR="${INST_DIR}/artifacts/${MODE}"
 
-# Удаление монтируемой папки с определенным параметром сборки
-rm -rf ${INST_DIR}/artifacts/${MODE} || true
+# Очистка предыдущих артефактов текущего режима
+rm -rf ${OUT_DIR} || true
 
-# Переменная Docker-образа
+# Docker образ
 IMAGE="iperf3:0.1"
 
-# Проверка, есть ли в локальном репозитории образ docker для сборки
+# Проверка, есть ли в локальном registry образ для сборки
 # Да -> собирает контейнер с параметром "--rm" на основе этого образа
 # Нет -> запускает сборку образа и собирает контейнер с этим образом
 if ! docker image inspect iperf3:0.1 >/dev/null 2>&1; then
@@ -40,24 +50,37 @@ if ! docker image inspect iperf3:0.1 >/dev/null 2>&1; then
     docker build --no-cache -t "${IMAGE}" .
 fi
 
-# Запуск контейнера + вывод используемых параметров, которые будут переданы в контейнер
+# Логирование параметров сборки
 echo -e "\033[33mStarting container with mode: ${MODE}\033[0m"
 echo "Режим сборки: ${MODE}"
 echo "Номер сборки: ${BUILD_NUM}"
 echo "Ревизия сборки: ${REVISION}"
 
+# ================================================================
+# СЛОЖНЫЙ DOCKER RUN с volume mounts для CI/CD pipeline
+# ================================================================
+# --rm: автоочистка контейнера
+# bind mounts: связанные директории между хостом и контейнером
 docker run --rm \
-    --mount type=bind,source="$(pwd)/${INST_DIR}/artifacts/${MODE}",target=/app/out/${MODE}/ \
-    --mount type=bind,source="$(pwd)/${INST_DIR}/ccache_dir",target=/ccache \
+    # Артефакты (.deb файлы) -> хост artifacts/${MODE}
+    --mount type=bind,source="$(pwd)/${OUT_DIR}",target=/app/out/${MODE}/ \
+    # ccache persistent между сборками
+    --mount type=bind,source="$(pwd)/${CACHE_DIR}",target=/ccache \
+    # Логи/отчеты -> хост report/
+    --mount type=bind,source="$(pwd)/${LOG_DIR}",target=/app/log \
+    # Coverage state (последний % покрытия)
     --mount type=bind,source="$(pwd)/${INST_DIR}/coverage_last.txt,target=/app/out/coverage_last.txt" \
+    # Env для ccache
     -e CCACHE_DIR=/ccache \
+    # Переменные сборки для использования уже в скрипте build_mode.sh
     -e MODE="${MODE}" \
     -e BUILD_NUM="${BUILD_NUM}" \
     -e REVISION="${REVISION}" \
+    # Сам образ контейнера (iperf3:0.1)
     "${IMAGE}"
 
 echo ""
 # Окончание сборки
 echo -e "\033[32m=== Сборка завершена ===\033[30m"
-echo "Результат сборки находится в artifacts/${MODE}"
-echo "Отчет находится в report/${REPORT_FILE}"
+echo "Артефакты: ${OUT_DIR}/${MODE}"
+echo "Отчет:     ${LOG_DIR}/${REPORT_FILE}"
