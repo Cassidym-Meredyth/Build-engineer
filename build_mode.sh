@@ -1,35 +1,46 @@
 #!/bin/bash
-# Автоматическая сборка iperf3
-# Использует ручной подход для создания deb пакетов через dpkg-deb и objcopy
-# Типы сборок: release, debug, coverage
-# Если будут использоваться другие типы сборок -> ошибка и выход
+# ================================================================
+# Local Pipeline: Debian Package Builder (project - iperf3)
+# ================================================================
+# Ручной подход dpkg-deb (.deb с debug symbols, coverage)
+# Режимы: release, debug, coverage
+# ================================================================
 set -euo pipefail
 
-# Переменные окружения для сборки deb-пакетов
+# ================================================================
+# ENVIRONMENT VARIABLES (из Docker run)
+# ================================================================
 MODE="${MODE?Error: MODE variable is not set}"
 BUILD_NUM="${BUILD_NUM?Error: BUILD_NUM variable is not set}"
 REVISION="${REVISION?Error: REVISION variable is not set}"
+
 # Используем схему версионирования для deb пакетов (своя сборка - свои версии сборок как ни как)
 BUILD_VERSION="1.0.${BUILD_NUM}"
 
-# Переменные для путей
-APP_DIR="/app"
-LOG_DIR="${APP_DIR}/log"
-TMP_DIR="${APP_DIR}/tmp"
-OUT_DIR="${APP_DIR}/out/${MODE}"
-STAGING_DIR="${APP_DIR}/staging"
-DEB_ROOT="${TMP_DIR}/deb"
-DEBUG_DEB_ROOT="${TMP_DIR}/debug-deb"
-PREV_FILE="${APP_DIR}/out/coverage_last.txt"
-COVERAGE_VALUE="0.0" # Значение покрытия кода по умолчанию
+# ================================================================
+# FILESYSTEM LAYOUT (staging -> deb -> artifacts)
+# ================================================================
+APP_DIR="/app"                                  # Docker WORKDIR
+LOG_DIR="${APP_DIR}/log"                        # Директория для логов
+TMP_DIR="${APP_DIR}/tmp"                        # Директория для временных файлов
+OUT_DIR="${APP_DIR}/out/${MODE}"                # Директория для артефактов сборки
+STAGING_DIR="${APP_DIR}/staging"                # make install DESTDIR
+DEB_ROOT="${TMP_DIR}/deb"                       # Директория для deb пакетов (root)
+DEBUG_DEB_ROOT="${TMP_DIR}/debug-deb"           # Директория для debug deb пакетов (root)
+PREV_FILE="${APP_DIR}/out/coverage_last.txt"    # Путь к предыдущему файлу покрытия кода
+COVERAGE_VALUE="0.0"                            # Значение покрытия кода по умолчанию
 
-# Подготовка оркужения: очистка и создание необходимых директорий
+# ================================================================
+# WORKSPACE CLEANUP + SETUP
+# ================================================================
+# Полная очистка предыдущих артефактов
 rm -rf "${STAGING_DIR}" "${TMP_DIR}" "${DEBUG_DEB_ROOT}" "${TMP_DIR}/iperf3"
 mkdir -p "${OUT_DIR}" "${STAGING_DIR}" "${DEB_ROOT}/DEBIAN" "${DEB_ROOT}/usr/bin"
-chmod -R 755 "${TMP_DIR}"
+chmod -R 755 "${TMP_DIR}" # Права для доступа docker
 
-# Логирование данных - файл build_report_{date_time}.txt
-# Предусмотрена возможность записи лог файла даже при ошибке выполнения скрипта (trap)
+# ================================================================
+# PERSISTENT LOGGING (trap: всегда запишет финал, даже при ошибке)
+# ================================================================
 LOG_FILE="${LOG_DIR}/build_report_${REVISION}.txt"
 
 trap 'echo "--- Build Report End ---" >> "${LOG_FILE}"' EXIT
@@ -40,17 +51,20 @@ trap 'echo "--- Build Report End ---" >> "${LOG_FILE}"' EXIT
     echo "Build type: ${MODE}"
 } >> "${LOG_FILE}"
 
-# Начало сборки с определенным параметром
+# ================================================================
+# BUILD START
+# ================================================================
 echo -e "\033[33m=== Building in ${MODE} mode ===\033[0m"
-./bootstrap.sh
+./bootstrap.sh # automake, autoconf (запуск сборки согласно документации iperf3)
 
-# Проверка параметра сборки
 case "$MODE" in
+    # ================================================================
     release)
+    # ================================================================
         echo -e "\033[33m=== Building in ${MODE} mode ===\033[0m"
         # Make сборки с тегом release
         ./configure CFLAGS="-O2 -Wall" LDFLAGS="-static" --disable-shared
-        make clean && make -j$(nproc)
+        make clean && make -j$(nproc) # параллельная сборка
         make install DESTDIR="${STAGING_DIR}"
 
         # Запуск процедуры strip для удаления отладочной информации
@@ -73,7 +87,9 @@ EOF
         # Создание release-пакета
         dpkg-deb --build "${DEB_ROOT}" "${OUT_DIR}/iperf3_${REVISION}_${BUILD_NUM}_amd64.deb"
         ;;
+    # ================================================================
     debug)
+    # ================================================================
         echo -e "\033[33m=== Building in ${MODE} mode ===\033[0m"
         # Make сборки с тегом debug
         ./configure CFLAGS="-g -O0 -Wall" LDFLAGS="-static"
@@ -82,7 +98,6 @@ EOF
 
         # Создание debug директорий
         mkdir -p "${DEBUG_DEB_ROOT}/DEBIAN" "${DEBUG_DEB_ROOT}/usr/lib/debug/usr/bin"
-
         DEBUG_BINARY="${STAGING_DIR}/usr/local/bin/iperf3"
         DEBUG_FILE="${TMP_DIR}/iperf3-debug-${REVISION}.dbg"
 
@@ -93,9 +108,8 @@ EOF
         strip --strip-all "${DEBUG_BINARY}"
         objcopy --add-gnu-debuglink "${DEBUG_FILE}" "${DEBUG_BINARY}"
 
+        # Бинарник для debug (stripped)
         cp "${DEBUG_BINARY}" "${DEB_ROOT}/usr/bin/iperf3"
-
-        # Создание control файла
         echo -e "\033[33mСоздание DEB-пакета для режима ${MODE}...\033[0m"
         cat > "${DEB_ROOT}/DEBIAN/control" << EOF
 Package: iperf3
@@ -109,7 +123,7 @@ Description: iperf3 network tool debug build v${BUILD_VERSION}
 EOF
         dpkg-deb --build "${DEB_ROOT}" "${OUT_DIR}/iperf3_${REVISION}_${BUILD_NUM}_amd64.deb"
 
-        # Отдельный debug пакет
+        # Бинарник для debug (debuglink)
         cp "${DEBUG_FILE}" "${DEBUG_DEB_ROOT}/usr/lib/debug/usr/bin/iperf3.debug"
         cat > "${DEBUG_DEB_ROOT}/DEBIAN/control" << EOF
 Package: iperf3-debug
@@ -124,18 +138,20 @@ Description: iperf3 debug symbols
 EOF
         dpkg-deb --build "${DEBUG_DEB_ROOT}" "${OUT_DIR}/iperf3-debug_${REVISION}_${BUILD_NUM}_amd64.deb"
         ;;
+    # ================================================================
     coverage)
+    # ================================================================
         echo -e "\033[33m=== Building in ${MODE} mode ===\033[0m"
         # Make сборки с тегом coverage
         ./configure CFLAGS="--coverage -O0 -g" LDFLAGS="--coverage"
         make clean && make -j$(nproc)
         make install DESTDIR="${STAGING_DIR}"
 
-        # Динамическая компиляция iperf3, надо для сборки coverage
+        # Динамическая компиляция iperf3, надо для сборки coverage (gcov libs)
         export LD_LIBRARY_PATH="${STAGING_DIR}/usr/local/lib:${LD_LIBRARY_PATH:-}"
         BIN="${STAGING_DIR}/usr/local/bin/iperf3"
 
-        # Интеграционное тестирование - тестируем iperf3 --version
+        # Интеграционное тестирование - тестируем "iperf3 --version"
         echo -e "\033[34mRunning integration test...\033[0m"
         ${BIN} --version || true
 
@@ -150,7 +166,7 @@ EOF
         lcov --remove coverage.info '/usr/*' \
              --output-file coverage.info
 
-        # Создаем отчет о покрытии кода - создаем html-отчет
+        # Создаем html-отчет о покрытии кода
         genhtml coverage.info --output-directory "${OUT_DIR}/coverage-report"
 
         # Переменная окружения о покрытии кода
@@ -184,7 +200,7 @@ EOF
         echo "${COVERAGE_VALUE}" > "${PREV_FILE}"
         echo ""
 
-        # Создание control файла
+        # Бинарник для coverage
         echo -e "\033[33m=== Создание DEB-пакета для режима ${MODE} ===\033[0m"
         cat > "${DEB_ROOT}/DEBIAN/control" << EOF
 Package: iperf3-coverage
@@ -200,13 +216,17 @@ EOF
         cp "${STAGING_DIR}/usr/local/bin/iperf3" "${DEB_ROOT}/usr/bin/"
         dpkg-deb --build "${DEB_ROOT}" "${OUT_DIR}/iperf3-coverage_${REVISION}_${BUILD_NUM}_amd64.deb"
         ;;
+    # ================================================================
     *)
+    # ================================================================
         echo "Invalid or unset mode: ${MODE}"
         exit 1
         ;;
 esac
 
-# Краткая информация о сборке
+# ================================================================
+# BUILD SUMMARY + ARTIFACTS
+# ================================================================
 echo -e "\033[32m=== Финальный отчет ===\033[0m"
 echo -e "\033[34mРазмер пакетов в ${OUT_DIR}:\033[30m"
 du -sh "${OUT_DIR}/"
