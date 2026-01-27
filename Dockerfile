@@ -12,14 +12,16 @@ FROM debian:stable-slim AS builder
 
 # Обновление пакетов и установка git
 RUN apt-get update && \
-    apt-get install -y git && \
+    apt-get install -y wget && \
     rm -rf /var/lib/apt/lists/*
 
 # Рабочая директория
 WORKDIR /app
 
 # Клонирование репозитория iperf3
-RUN git clone https://github.com/esnet/iperf.git
+RUN wget https://github.com/esnet/iperf/releases/download/3.20/iperf-3.20.tar.gz && \
+    tar -xzf iperf-3.20.tar.gz && \
+    rm iperf-3.20.tar.gz
 
 # ================================================================
 # STAGE 2: Build + Package Runner
@@ -44,7 +46,7 @@ ENV PATH="/usr/lib/ccache:$PATH"
 WORKDIR /app/iperf
 
 # Передача исходников из git репозитория из предыдущего стейджа
-COPY --from=builder /app/iperf/ .
+COPY --from=builder /app/iperf-3.20/ .
 
 # Передача скрипта
 COPY build_mode.sh /app/iperf/build_mode.sh
