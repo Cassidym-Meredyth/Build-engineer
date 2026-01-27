@@ -18,7 +18,7 @@ RUN apt-get update && \
 # Рабочая директория
 WORKDIR /app
 
-# Клонирование репозитория iperf3
+# Клонирование из релиза iperf3 iperf-3.20
 RUN wget https://github.com/esnet/iperf/releases/download/3.20/iperf-3.20.tar.gz && \
     tar -xzf iperf-3.20.tar.gz && \
     rm iperf-3.20.tar.gz
