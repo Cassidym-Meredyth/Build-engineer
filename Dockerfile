@@ -1,12 +1,12 @@
 # ================================================================
 # Local Pipeline: Docker Pipeline for iperf3 Debian Packaging
 # ================================================================
-# STAGES: builder (git clone) -> runner (direct source build)
+# STAGES: builder (wget && tar) -> runner (direct source build)
 # ENTRYPOINT: build_mode.sh (MODE=release|debug|coverage -> .deb)
 # ================================================================
 
 # ================================================================
-# STAGE 1: git clone
+# STAGE 1: wget + tar
 # ================================================================
 FROM debian:stable-slim AS builder
 
