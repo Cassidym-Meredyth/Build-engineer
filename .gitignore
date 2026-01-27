@@ -57,3 +57,4 @@ dkms.conf
 
 docker-compose.yml
 inst_dir/*
+AGENTS.md
