@@ -73,6 +73,7 @@ build.sh -> Docker (multi-stage) -> build_mode.sh -> .deb artifacts
 | dh_make -> debian/rules -> debuild | ./configure -> make -> dpkg-deb | Полный контроль над: <br> - Debug symbols workflow<br> - Custom control файлы <br> - Multi-package output (binary+debug) <br> - Coverage в .deb |
 
 - **Два `.deb` пакета в Debug-сборке**: один для основного приложения и другой для отладочных символов.
+- **HTML-отчет о покрытии кода**: генерируется после сборки и сохраняется в `inst_dir/artifacts/coverage/coverage_report/index.html`.
 
 ## Примечания для проверки
 - Все артефакты и отчеты появляются в `inst_dir/`.
