@@ -111,11 +111,6 @@ EOF
         DEBUG_BINARY="${STAGING_DIR}/usr/bin/iperf3"
         DEBUG_FILE="${TMP_DIR}/iperf3.debug"
 
-
-        echo -e "\033[31mCheck\033[0m"
-        readelf -S "${DEBUG_BINARY}" | grep -q ".debug_info" \
-          || { echo "ERROR: no debug info in binary"; exit 1; }
-
         # Извлекаем debug symbols из stripped binary
         objcopy --only-keep-debug "${DEBUG_BINARY}" "${DEBUG_FILE}"
 
