@@ -248,10 +248,11 @@ EOF
         ;;
 esac
 
+[ ${MODE} == "coverage" ] && echo "Coverage: ${COVERAGE_VALUE}%" >> ${LOG_FILE}
+
 # ================================================================
 # BUILD SUMMARY + ARTIFACTS
 # ================================================================
-[ ${MODE} == "coverage" ] && echo "Coverage: ${COVERAGE_VALUE}%" >> ${LOG_FILE}
 echo -e "\033[32m=== Финальный отчет ===\033[0m"
 echo -e "\033[34mРазмер пакетов в ${OUT_DIR}:\033[30m"
 du -sh "${OUT_DIR}/"
