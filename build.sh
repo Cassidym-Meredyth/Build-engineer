@@ -23,15 +23,17 @@ CACHE_DIR="${INST_DIR}/ccache_dir"
 # ПАРАМЕТРЫ СБОРКИ (CI/CD переменные)
 # ================================================================
 # MODE=release|debug|coverage - режим компиляции
-# REVISION - timestamp ревизии (дата_время)
+# TIMESTAMP - дата_время для написания репорта
 # BUILD_NUM - автоинкрементный номер сборки
+# REVISION - номер ревизии (date_time + build_num)
 MODE="$1"
-REVISION="$(date +%d_%m_%Y_%H_%M_%S)"
+TIMESTAMP="$(date +%d_%m_%Y_%H_%M_%S)"
 BUILD_NUM="$(find ./${INST_DIR}/report -maxdepth 1 -name 'build_report_*.txt' | wc -l)"
 BUILD_NUM="$((BUILD_NUM + 1))"
+REVISION="${TIMESTAMP}-${BUILD_NUM}"
 
 # Имя файла отчета текущей сборки - build_report_{date_time}.txt
-REPORT_FILE="build_report_${REVISION}.txt"
+REPORT_FILE="build_report_${TIMESTAMP}.txt"
 
 # Директория выходных артефактов (.deb, coverage reports)
 OUT_DIR="${INST_DIR}/artifacts/${MODE}"
@@ -83,6 +85,7 @@ docker run --rm \
     -e MODE="${MODE}" \
     -e BUILD_NUM="${BUILD_NUM}" \
     -e REVISION="${REVISION}" \
+    -e TIMESTAMP="${TIMESTAMP}" \
     "${IMAGE}"
 
 echo ""

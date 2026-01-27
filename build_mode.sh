@@ -12,6 +12,7 @@ set -euo pipefail
 # ================================================================
 MODE="${MODE?Error: MODE variable is not set}"
 BUILD_NUM="${BUILD_NUM?Error: BUILD_NUM variable is not set}"
+TIMESTAMP="${TIMESTAMP?Error: TIMESTAMP variable is not set}"
 REVISION="${REVISION?Error: REVISION variable is not set}"
 
 # Используем схему версионирования для deb пакетов (своя сборка - свои версии сборок как ни как)
@@ -41,7 +42,7 @@ chmod -R 755 "${TMP_DIR}" # Права для доступа docker
 # ================================================================
 # PERSISTENT LOGGING (trap: всегда запишет финал, даже при ошибке)
 # ================================================================
-LOG_FILE="${LOG_DIR}/build_report_${REVISION}.txt"
+LOG_FILE="${LOG_DIR}/build_report_${TIMESTAMP}.txt"
 
 trap 'echo "--- Build Report End ---" >> "${LOG_FILE}"' EXIT
 {
@@ -90,7 +91,7 @@ EOF
         cp "${STAGING_DIR}/usr/bin/iperf3" "${DEB_ROOT}/usr/bin/"
 
         # Создание release-пакета
-        dpkg-deb --build "${DEB_ROOT}" "${OUT_DIR}/iperf3_${REVISION}_${BUILD_NUM}_amd64.deb"
+        dpkg-deb --build "${DEB_ROOT}" "${OUT_DIR}/iperf3_${REVISION}_amd64.deb"
         ;;
     # ================================================================
     debug)
@@ -133,7 +134,7 @@ Priority: optional
 Description: iperf3 network tool debug build v${BUILD_VERSION}
     Stripped binary with debuglink for gdb. Use with iperf3-debug package.
 EOF
-        dpkg-deb --build "${DEB_ROOT}" "${OUT_DIR}/iperf3_${REVISION}_${BUILD_NUM}_amd64.deb"
+        dpkg-deb --build "${DEB_ROOT}" "${OUT_DIR}/iperf3_${REVISION}_amd64.deb"
 
         # Бинарник для debug (debuglink)
         cp "${DEBUG_FILE}" "${DEBUG_DEB_ROOT}/usr/lib/debug/usr/bin/iperf3.debug"
@@ -148,7 +149,7 @@ Depends: iperf3 (= ${BUILD_VERSION})
 Description: iperf3 debug symbols
     Debug information package.
 EOF
-        dpkg-deb --build "${DEBUG_DEB_ROOT}" "${OUT_DIR}/iperf3-debug_${REVISION}_${BUILD_NUM}_amd64.deb"
+        dpkg-deb --build "${DEBUG_DEB_ROOT}" "${OUT_DIR}/iperf3-debug_${REVISION}_amd64.deb"
         ;;
     # ================================================================
     coverage)
@@ -233,7 +234,7 @@ Description: iperf3 network tool coverage build v${BUILD_VERSION}
 EOF
 
         cp "${STAGING_DIR}/usr/bin/iperf3" "${DEB_ROOT}/usr/bin/"
-        dpkg-deb --build "${DEB_ROOT}" "${OUT_DIR}/iperf3-coverage_${REVISION}_${BUILD_NUM}_amd64.deb"
+        dpkg-deb --build "${DEB_ROOT}" "${OUT_DIR}/iperf3-coverage_${REVISION}_amd64.deb"
         ;;
     # ================================================================
     *)

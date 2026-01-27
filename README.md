@@ -52,6 +52,8 @@ build.sh -> Docker (multi-stage) -> build_mode.sh -> .deb artifacts
 - Каждый запуск пишет файл `inst_dir/report/build_report_{date_time}.txt`.
 - В отчете фиксируются: номер запуска, ревизия, режим сборки, покрытие (при сборке с coverage).
 
+*Номер ревизии - это комбинация даты и времени запуска и номера запуска.*
+
 ## Артефакты
 - `inst_dir/artifacts/release/*.deb`
 - `inst_dir/artifacts/debug/*.deb`
