@@ -1,2 +1,5 @@
-Data
+.gitignore
+build.sh
 Dockerfile
+README.md
+start.sh

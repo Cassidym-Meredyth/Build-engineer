@@ -1,31 +1,56 @@
-FROM alpine:3.23.2 AS builder
+# ================================================================
+# Local Pipeline: Docker Pipeline for iperf3 Debian Packaging
+# ================================================================
+# STAGES: builder (wget && tar) -> runner (direct source build)
+# ENTRYPOINT: build_mode.sh (MODE=release|debug|coverage -> .deb)
+# ================================================================
 
-RUN apk update && \
-    apk add build-base && \
-    apk add ncurses-dev && \
-    apk add git
+# ================================================================
+# STAGE 1: wget + tar
+# ================================================================
+FROM debian:stable-slim AS builder
 
+# Обновление пакетов и установка git
+RUN apt-get update && \
+    apt-get install -y wget && \
+    rm -rf /var/lib/apt/lists/*
+
+# Рабочая директория
 WORKDIR /app
 
-RUN git clone https://github.com/NicolasHug/snake.git && \
-    cd snake && \
-    make snake && \
-    mv /app/snake/snake /app/snake_game && \
-    cd .. && \
-    rm -rf /app/snake
+# Клонирование из релиза iperf3 iperf-3.20
+RUN wget https://github.com/esnet/iperf/releases/download/3.20/iperf-3.20.tar.gz && \
+    tar -xzf iperf-3.20.tar.gz && \
+    rm iperf-3.20.tar.gz
 
-USER snake
+# ================================================================
+# STAGE 2: Build + Package Runner
+# ================================================================
+FROM debian:stable-slim AS runner
 
-FROM alpine:3.23.2
+# Установка необходимых инструментов
+RUN apt-get update && \
+    apt-get install -y \
+    # Пакеты для сборки проекта iperf3
+    autoconf automake libtool pkg-config \
+    # Компиляция + сборка deb-пакета
+    build-essential lcov checkinstall bc libssl-dev \
+    # Установка ccache (сборка с использованием кеша)
+    ccache && \
+    rm -rf /var/lib/apt/lists/*
 
-COPY --from=builder /app/snake_game /app/snake_game
+# ccache в PATH
+ENV PATH="/usr/lib/ccache:$PATH"
 
-RUN apk update && apk add ncurses && rm -rf /var/cache/apk/* && \
-    addgroup -S snake && \
-    adduser -S snake -G snake && \
-    chown snake:snake /app/snake_game
+# Рабочая директория
+WORKDIR /app/iperf
 
-WORKDIR /app
-USER snake
+# Передача исходников из git репозитория из предыдущего стейджа
+COPY --from=builder /app/iperf-3.20/ .
 
-CMD ["./snake_game"]
+# Передача скрипта
+COPY build_mode.sh /app/iperf/build_mode.sh
+RUN chmod +x /app/iperf/build_mode.sh
+
+# Запуск скрипта сразу после запуска контейнера
+ENTRYPOINT ["./build_mode.sh"]

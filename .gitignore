@@ -53,3 +53,8 @@ dkms.conf
 
 # debug information files
 *.dwo
+
+
+docker-compose.yml
+inst_dir/*
+AGENTS.md
