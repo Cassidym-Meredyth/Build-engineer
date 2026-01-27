@@ -200,8 +200,6 @@ EOF
            sed 's/%//')
         COVERAGE_VALUE=${COVERAGE_VALUE:-0}
 
-        echo -e "\033[31mCoverage\033[0m: ${COVERAGE_VALUE}%\n"
-
         # Сравнение покрытия кода с предыдущим значением
         echo -e "\033[33mCoverage comprasion...\033[0m"
         PREV_FILE="/app/out/coverage_last.txt"
@@ -210,7 +208,8 @@ EOF
         if [ -f "${PREV_FILE}" ]; then
                 PREV_COVERAGE=$(cat "${PREV_FILE}")
                 PREV_COVERAGE=${PREV_COVERAGE:-0}
-                echo "Previous coverage: ${PREV_COVERAGE}%"
+                echo -e "\033[31mPrevious coverage\033[0m: ${PREV_COVERAGE}%"
+                echo -e "\033[31mCoverage\033[0m:          ${COVERAGE_VALUE}%\n"
 
                 if [ "$(echo "${COVERAGE_VALUE} < ${PREV_COVERAGE}" | bc -l )" -eq 1 ]; then
                         echo -e "\033[31mCoverage decreased!\033[0m"
