@@ -32,7 +32,7 @@ RUN apt-get update && \
     # Пакеты для сборки проекта iperf3
     autoconf automake libtool pkg-config \
     # Компиляция + сборка deb-пакета
-    build-essential lcov checkinstall bc \
+    build-essential lcov checkinstall bc libssl-dev \
     # Установка ccache (сборка с использованием кеша)
     ccache && \
     rm -rf /var/lib/apt/lists/*
