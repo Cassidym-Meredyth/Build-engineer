@@ -24,7 +24,7 @@ build.sh -> Docker (multi-stage) -> build_mode.sh -> .deb artifacts
 | Dockerfile    | Multi-stage: git clone -> build environment                       |
 | build_mode.sh | Логика сборки: ./configure -> make -> make install -> dpkg-deb    |
 | inst_dir/     | Workspace: artifacts, reports, ccache                             |
-| start.sh      | Запуск всех режимов последовательно.                              |
+| start.sh      | Запуск всех режимов последовательно                               |
 
 ## Быстрый старт
 Сборка в нужном режиме:
@@ -66,7 +66,7 @@ build.sh -> Docker (multi-stage) -> build_mode.sh -> .deb artifacts
 | ~900MB              | ~800MB              | На 12% меньше размер |
 | Весь toolchain      | Только runtime deps | Быстрее pull     |
 
-- **dpkg-deb вместо dh_make/debuild**: позволяет контролировать состав пакета, отдельно формировать debug symbols и добавлять метаданные (dh_make не поддерживает ).
+- **dpkg-deb вместо dh_make/debuild**: позволяет контролировать состав пакета, отдельно формировать debug symbols и добавлять метаданные.
 
 | Стандарт                         | Мой подход                    | Обоснование                                                                                                                       |
 | -------------------------------- | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
