@@ -63,12 +63,17 @@ case "$MODE" in
     # ================================================================
         echo -e "\033[33m=== Building in ${MODE} mode ===\033[0m"
         # Make сборки с тегом release
-        ./configure CFLAGS="-O2 -Wall" LDFLAGS="-static" --disable-shared
+        ./configure \
+            --prefix=/usr \
+            CFLAGS="-O2 -Wall" \
+            LDFLAGS="" \
+            --enable-shared \
+            --disable-static-bin
         make clean && make -j$(nproc) # параллельная сборка
         make install DESTDIR="${STAGING_DIR}"
 
         # Запуск процедуры strip для удаления отладочной информации
-        strip -s "${STAGING_DIR}/usr/local/bin/iperf3"
+        strip -s "${STAGING_DIR}/usr/bin/iperf3"
 
         # Файл control: краткая информация о release-пакете
         cat > "${DEB_ROOT}/DEBIAN/control" << EOF
@@ -82,7 +87,7 @@ Description: iperf3 network tool v${BUILD_VERSION}
     Stripped release build
 EOF
         # Копирование бинарника с удаленной отладочной информацией (strip)
-        cp "${STAGING_DIR}/usr/local/bin/iperf3" "${DEB_ROOT}/usr/bin/"
+        cp "${STAGING_DIR}/usr/bin/iperf3" "${DEB_ROOT}/usr/bin/"
 
         # Создание release-пакета
         dpkg-deb --build "${DEB_ROOT}" "${OUT_DIR}/iperf3_${REVISION}_${BUILD_NUM}_amd64.deb"
@@ -92,21 +97,33 @@ EOF
     # ================================================================
         echo -e "\033[33m=== Building in ${MODE} mode ===\033[0m"
         # Make сборки с тегом debug
-        ./configure CFLAGS="-g -O0 -Wall" LDFLAGS="-static"
-        make clean && make -j$(nproc)
+        ./configure \
+            --prefix=/usr \
+            CFLAGS="-g -O0 -Wall" \
+            LDFLAGS="-static" \
+            --enable-static-bin \
+            --disable-shared
+        make clean && make -j$(nproc) V=1 --output-sync=target
         make install DESTDIR="${STAGING_DIR}"
 
         # Создание debug директорий
         mkdir -p "${DEBUG_DEB_ROOT}/DEBIAN" "${DEBUG_DEB_ROOT}/usr/lib/debug/usr/bin"
-        DEBUG_BINARY="${STAGING_DIR}/usr/local/bin/iperf3"
-        DEBUG_FILE="${TMP_DIR}/iperf3-debug-${REVISION}.dbg"
+        DEBUG_BINARY="${STAGING_DIR}/usr/bin/iperf3"
+        DEBUG_FILE="${TMP_DIR}/iperf3.debug"
 
-        # Извлекаем debug symbols
+
+        echo -e "\033[31mCheck\033[0m"
+        readelf -S "${DEBUG_BINARY}" | grep -q ".debug_info" \
+          || { echo "ERROR: no debug info in binary"; exit 1; }
+
+        # Извлекаем debug symbols из stripped binary
         objcopy --only-keep-debug "${DEBUG_BINARY}" "${DEBUG_FILE}"
 
         # Strip binary (оставить debuglink)
-        strip --strip-all "${DEBUG_BINARY}"
-        objcopy --add-gnu-debuglink "${DEBUG_FILE}" "${DEBUG_BINARY}"
+        strip --strip-debug "${DEBUG_BINARY}"
+
+        # Добавляем debuglink
+        # objcopy --add-gnu-debuglink="${DEBUG_FILE}" "${DEBUG_BINARY}"
 
         # Бинарник для debug (stripped)
         cp "${DEBUG_BINARY}" "${DEB_ROOT}/usr/bin/iperf3"
@@ -143,13 +160,20 @@ EOF
     # ================================================================
         echo -e "\033[33m=== Building in ${MODE} mode ===\033[0m"
         # Make сборки с тегом coverage
-        ./configure CFLAGS="--coverage -O0 -g" LDFLAGS="--coverage"
-        make clean && make -j$(nproc)
+        ./configure \
+          --prefix=/usr \
+          CFLAGS="--coverage -O0 -g -fno-inline -Wall" \
+          LDFLAGS="--coverage -lgcov" \
+          --disable-shared
+        make clean -j$(nproc)
+        make -j$(nproc) V=1
         make install DESTDIR="${STAGING_DIR}"
+
+        strip -s "${STAGING_DIR}/usr/bin/iperf3"
 
         # Динамическая компиляция iperf3, надо для сборки coverage (gcov libs)
         export LD_LIBRARY_PATH="${STAGING_DIR}/usr/local/lib:${LD_LIBRARY_PATH:-}"
-        BIN="${STAGING_DIR}/usr/local/bin/iperf3"
+        BIN="${STAGING_DIR}/usr/bin/iperf3"
 
         # Интеграционное тестирование - тестируем "iperf3 --version"
         echo -e "\033[34mRunning integration test...\033[0m"
@@ -213,7 +237,7 @@ Description: iperf3 network tool coverage build v${BUILD_VERSION}
     Coverage: ${COVERAGE_VALUE}%
 EOF
 
-        cp "${STAGING_DIR}/usr/local/bin/iperf3" "${DEB_ROOT}/usr/bin/"
+        cp "${STAGING_DIR}/usr/bin/iperf3" "${DEB_ROOT}/usr/bin/"
         dpkg-deb --build "${DEB_ROOT}" "${OUT_DIR}/iperf3-coverage_${REVISION}_${BUILD_NUM}_amd64.deb"
         ;;
     # ================================================================
