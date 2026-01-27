@@ -1,0 +1,5 @@
+=== Building in debug mode ===
+Run Num: 2
+Revision: 27_01_2026_16_09_14
+Build type: debug
+--- Build Report End ---
